@@ -40,6 +40,35 @@ local function Tween(object, properties, duration, style, direction)
     return tween
 end
 
+-- Create ripple effect
+local function CreateRipple(button)
+    local ripple = Instance.new("Frame")
+    ripple.Name = "Ripple"
+    ripple.AnchorPoint = Vector2.new(0.5, 0.5)
+    ripple.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    ripple.BackgroundTransparency = 0.5
+    ripple.BorderSizePixel = 0
+    ripple.Position = UDim2.new(0.5, 0, 0.5, 0)
+    ripple.Size = UDim2.new(0, 0, 0, 0)
+    ripple.ZIndex = 100
+    ripple.Parent = button
+    
+    local rippleCorner = Instance.new("UICorner")
+    rippleCorner.CornerRadius = UDim.new(1, 0)
+    rippleCorner.Parent = ripple
+    
+    local maxSize = math.max(button.AbsoluteSize.X, button.AbsoluteSize.Y) * 2
+    
+    Tween(ripple, {
+        Size = UDim2.new(0, maxSize, 0, maxSize),
+        BackgroundTransparency = 1
+    }, 0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    
+    task.delay(0.6, function()
+        ripple:Destroy()
+    end)
+end
+
 -- Convert Color3 to Hex
 local function ColorToHex(color)
     return string.format("#%02X%02X%02X", 
@@ -75,11 +104,15 @@ end
 function Library:CreateWindow(title)
     title = title or "UI Library"
     
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    
     -- Create ScreenGui
     local ScreenGui = Instance.new("ScreenGui")
     ScreenGui.Name = "UILibrary"
     ScreenGui.ResetOnSpawn = false
     ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    ScreenGui.Enabled = false -- Start hidden for intro animation
     
     -- Main Window Frame
     local MainWindow = Instance.new("Frame")
@@ -92,6 +125,21 @@ function Library:CreateWindow(title)
     MainWindow.Size = UDim2.new(0, 600, 0, 500)
     MainWindow.Active = true
     MainWindow.ClipsDescendants = true
+    MainWindow.BackgroundTransparency = 1
+    
+    -- Add shadow/glow effect
+    local Shadow = Instance.new("ImageLabel")
+    Shadow.Name = "Shadow"
+    Shadow.Parent = MainWindow
+    Shadow.BackgroundTransparency = 1
+    Shadow.Position = UDim2.new(0, -20, 0, -20)
+    Shadow.Size = UDim2.new(1, 40, 1, 40)
+    Shadow.ZIndex = 0
+    Shadow.Image = "rbxassetid://5554236805"
+    Shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+    Shadow.ImageTransparency = 0.5
+    Shadow.ScaleType = Enum.ScaleType.Slice
+    Shadow.SliceCenter = Rect.new(23, 23, 277, 277)
     
     -- Make window draggable
     local dragging = false
@@ -136,6 +184,28 @@ function Library:CreateWindow(title)
     AccentLine.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
     AccentLine.BorderSizePixel = 0
     AccentLine.Size = UDim2.new(1, 0, 0, 2)
+    AccentLine.ZIndex = 2
+    
+    -- Animated gradient on accent line
+    local AccentGradient = Instance.new("UIGradient")
+    AccentGradient.Parent = AccentLine
+    AccentGradient.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(100, 100, 255)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(150, 100, 255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(100, 100, 255))
+    }
+    AccentGradient.Rotation = 0
+    
+    -- Animate gradient
+    task.spawn(function()
+        while AccentLine and AccentLine.Parent do
+            for i = 0, 360, 2 do
+                if not AccentLine or not AccentLine.Parent then break end
+                AccentGradient.Rotation = i
+                task.wait(0.03)
+            end
+        end
+    end)
     
     -- Title Bar
     local TitleBar = Instance.new("Frame")
@@ -145,6 +215,7 @@ function Library:CreateWindow(title)
     TitleBar.BorderSizePixel = 0
     TitleBar.Position = UDim2.new(0, 0, 0, 2)
     TitleBar.Size = UDim2.new(1, 0, 0, 30)
+    TitleBar.ZIndex = 2
     
     -- Title Text
     local TitleLabel = Instance.new("TextLabel")
@@ -153,11 +224,46 @@ function Library:CreateWindow(title)
     TitleLabel.BackgroundTransparency = 1
     TitleLabel.Position = UDim2.new(0, 10, 0, 0)
     TitleLabel.Size = UDim2.new(1, -50, 1, 0)
-    TitleLabel.Font = Enum.Font.Code
+    TitleLabel.Font = Enum.Font.GothamBold
     TitleLabel.Text = title
     TitleLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
     TitleLabel.TextSize = 14
     TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TitleLabel.ZIndex = 3
+    
+    -- Minimize Button
+    local MinimizeButton = Instance.new("TextButton")
+    MinimizeButton.Name = "MinimizeButton"
+    MinimizeButton.Parent = TitleBar
+    MinimizeButton.BackgroundTransparency = 1
+    MinimizeButton.Position = UDim2.new(1, -60, 0, 0)
+    MinimizeButton.Size = UDim2.new(0, 30, 1, 0)
+    MinimizeButton.Font = Enum.Font.GothamBold
+    MinimizeButton.Text = "_"
+    MinimizeButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+    MinimizeButton.TextSize = 16
+    MinimizeButton.ZIndex = 3
+    
+    local isMinimized = false
+    
+    MinimizeButton.MouseEnter:Connect(function()
+        Tween(MinimizeButton, {TextColor3 = Color3.fromRGB(100, 100, 255)}, 0.15)
+    end)
+    
+    MinimizeButton.MouseLeave:Connect(function()
+        Tween(MinimizeButton, {TextColor3 = Color3.fromRGB(200, 200, 200)}, 0.15)
+    end)
+    
+    MinimizeButton.MouseButton1Click:Connect(function()
+        isMinimized = not isMinimized
+        if isMinimized then
+            Tween(MainWindow, {Size = UDim2.new(0, 600, 0, 32)}, 0.3, Enum.EasingStyle.Back)
+            MinimizeButton.Text = "□"
+        else
+            Tween(MainWindow, {Size = UDim2.new(0, 600, 0, 500)}, 0.3, Enum.EasingStyle.Back)
+            MinimizeButton.Text = "_"
+        end
+    end)
     
     -- Close Button
     local CloseButton = Instance.new("TextButton")
@@ -166,21 +272,37 @@ function Library:CreateWindow(title)
     CloseButton.BackgroundTransparency = 1
     CloseButton.Position = UDim2.new(1, -30, 0, 0)
     CloseButton.Size = UDim2.new(0, 30, 1, 0)
-    CloseButton.Font = Enum.Font.Code
+    CloseButton.Font = Enum.Font.GothamBold
     CloseButton.Text = "X"
     CloseButton.TextColor3 = Color3.fromRGB(200, 200, 200)
     CloseButton.TextSize = 14
+    CloseButton.ZIndex = 3
     
     -- Close button hover effect
     CloseButton.MouseEnter:Connect(function()
-        Tween(CloseButton, {TextColor3 = Color3.fromRGB(255, 100, 100)})
+        Tween(CloseButton, {TextColor3 = Color3.fromRGB(255, 100, 100)}, 0.15)
     end)
     
     CloseButton.MouseLeave:Connect(function()
-        Tween(CloseButton, {TextColor3 = Color3.fromRGB(200, 200, 200)})
+        Tween(CloseButton, {TextColor3 = Color3.fromRGB(200, 200, 200)}, 0.15)
     end)
     
     CloseButton.MouseButton1Click:Connect(function()
+        -- Fade out animation
+        Tween(MainWindow, {BackgroundTransparency = 1}, 0.3)
+        Tween(Shadow, {ImageTransparency = 1}, 0.3)
+        for _, child in pairs(MainWindow:GetDescendants()) do
+            if child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox") then
+                Tween(child, {TextTransparency = 1}, 0.3)
+            end
+            if child:IsA("Frame") or child:IsA("ScrollingFrame") then
+                Tween(child, {BackgroundTransparency = 1}, 0.3)
+            end
+            if child:IsA("ImageLabel") or child:IsA("ImageButton") then
+                Tween(child, {ImageTransparency = 1}, 0.3)
+            end
+        end
+        task.wait(0.3)
         ScreenGui:Destroy()
     end)
     
@@ -192,6 +314,7 @@ function Library:CreateWindow(title)
     TabContainer.BorderSizePixel = 0
     TabContainer.Position = UDim2.new(0, 0, 0, 32)
     TabContainer.Size = UDim2.new(0, 140, 1, -32)
+    TabContainer.ZIndex = 2
     
     -- Tab Separator Line
     local TabSeparator = Instance.new("Frame")
@@ -201,12 +324,145 @@ function Library:CreateWindow(title)
     TabSeparator.BorderSizePixel = 0
     TabSeparator.Position = UDim2.new(1, 0, 0, 0)
     TabSeparator.Size = UDim2.new(0, 1, 1, 0)
+    TabSeparator.ZIndex = 2
+    
+    -- User Profile Section (Bottom of sidebar)
+    local ProfileSection = Instance.new("Frame")
+    ProfileSection.Name = "ProfileSection"
+    ProfileSection.Parent = TabContainer
+    ProfileSection.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
+    ProfileSection.BorderSizePixel = 0
+    ProfileSection.Position = UDim2.new(0, 0, 1, -70)
+    ProfileSection.Size = UDim2.new(1, 0, 0, 70)
+    ProfileSection.ZIndex = 3
+    
+    -- Profile separator line
+    local ProfileSeparator = Instance.new("Frame")
+    ProfileSeparator.Parent = ProfileSection
+    ProfileSeparator.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    ProfileSeparator.BorderSizePixel = 0
+    ProfileSeparator.Size = UDim2.new(1, 0, 0, 1)
+    ProfileSeparator.ZIndex = 3
+    
+    -- User Avatar
+    local AvatarFrame = Instance.new("Frame")
+    AvatarFrame.Name = "AvatarFrame"
+    AvatarFrame.Parent = ProfileSection
+    AvatarFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    AvatarFrame.BorderSizePixel = 0
+    AvatarFrame.Position = UDim2.new(0, 10, 0, 10)
+    AvatarFrame.Size = UDim2.new(0, 50, 0, 50)
+    AvatarFrame.ZIndex = 4
+    
+    local AvatarCorner = Instance.new("UICorner")
+    AvatarCorner.CornerRadius = UDim.new(0, 8)
+    AvatarCorner.Parent = AvatarFrame
+    
+    -- Avatar border glow
+    local AvatarBorder = Instance.new("UIStroke")
+    AvatarBorder.Parent = AvatarFrame
+    AvatarBorder.Color = Color3.fromRGB(100, 100, 255)
+    AvatarBorder.Thickness = 2
+    AvatarBorder.Transparency = 0.5
+    
+    -- Animate border glow
+    task.spawn(function()
+        while AvatarBorder and AvatarBorder.Parent do
+            Tween(AvatarBorder, {Transparency = 0.2}, 1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+            task.wait(1)
+            Tween(AvatarBorder, {Transparency = 0.7}, 1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+            task.wait(1)
+        end
+    end)
+    
+    local Avatar = Instance.new("ImageLabel")
+    Avatar.Name = "Avatar"
+    Avatar.Parent = AvatarFrame
+    Avatar.BackgroundTransparency = 1
+    Avatar.Size = UDim2.new(1, 0, 1, 0)
+    Avatar.Image = "rbxthumb://type=AvatarHeadShot&id=" .. LocalPlayer.UserId .. "&w=150&h=150"
+    Avatar.ZIndex = 5
+    
+    local AvatarImageCorner = Instance.new("UICorner")
+    AvatarImageCorner.CornerRadius = UDim.new(0, 8)
+    AvatarImageCorner.Parent = Avatar
+    
+    -- Username
+    local UsernameLabel = Instance.new("TextLabel")
+    UsernameLabel.Name = "Username"
+    UsernameLabel.Parent = ProfileSection
+    UsernameLabel.BackgroundTransparency = 1
+    UsernameLabel.Position = UDim2.new(0, 65, 0, 12)
+    UsernameLabel.Size = UDim2.new(1, -70, 0, 18)
+    UsernameLabel.Font = Enum.Font.GothamBold
+    UsernameLabel.Text = LocalPlayer.Name
+    UsernameLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+    UsernameLabel.TextSize = 12
+    UsernameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    UsernameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+    UsernameLabel.ZIndex = 5
+    
+    -- Display Name
+    local DisplayNameLabel = Instance.new("TextLabel")
+    DisplayNameLabel.Name = "DisplayName"
+    DisplayNameLabel.Parent = ProfileSection
+    DisplayNameLabel.BackgroundTransparency = 1
+    DisplayNameLabel.Position = UDim2.new(0, 65, 0, 30)
+    DisplayNameLabel.Size = UDim2.new(1, -70, 0, 14)
+    DisplayNameLabel.Font = Enum.Font.Gotham
+    DisplayNameLabel.Text = "@" .. LocalPlayer.DisplayName
+    DisplayNameLabel.TextColor3 = Color3.fromRGB(150, 150, 150)
+    DisplayNameLabel.TextSize = 10
+    DisplayNameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    DisplayNameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+    DisplayNameLabel.ZIndex = 5
+    
+    -- Status indicator
+    local StatusDot = Instance.new("Frame")
+    StatusDot.Name = "StatusDot"
+    StatusDot.Parent = ProfileSection
+    StatusDot.BackgroundColor3 = Color3.fromRGB(0, 255, 100)
+    StatusDot.BorderSizePixel = 0
+    StatusDot.Position = UDim2.new(0, 65, 0, 48)
+    StatusDot.Size = UDim2.new(0, 6, 0, 6)
+    StatusDot.ZIndex = 5
+    
+    local StatusCorner = Instance.new("UICorner")
+    StatusCorner.CornerRadius = UDim.new(1, 0)
+    StatusCorner.Parent = StatusDot
+    
+    -- Pulse animation for status dot
+    task.spawn(function()
+        while StatusDot and StatusDot.Parent do
+            Tween(StatusDot, {BackgroundColor3 = Color3.fromRGB(100, 255, 150)}, 0.8, Enum.EasingStyle.Sine)
+            task.wait(0.8)
+            Tween(StatusDot, {BackgroundColor3 = Color3.fromRGB(0, 255, 100)}, 0.8, Enum.EasingStyle.Sine)
+            task.wait(0.8)
+        end
+    end)
+    
+    local StatusLabel = Instance.new("TextLabel")
+    StatusLabel.Parent = ProfileSection
+    StatusLabel.BackgroundTransparency = 1
+    StatusLabel.Position = UDim2.new(0, 75, 0, 45)
+    StatusLabel.Size = UDim2.new(1, -80, 0, 12)
+    StatusLabel.Font = Enum.Font.Gotham
+    StatusLabel.Text = "Online"
+    StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 100)
+    StatusLabel.TextSize = 9
+    StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+    StatusLabel.ZIndex = 5
     
     -- Tab List Layout
     local TabLayout = Instance.new("UIListLayout")
     TabLayout.Parent = TabContainer
     TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
     TabLayout.Padding = UDim.new(0, 0)
+    
+    -- Add padding to account for profile section
+    local TabPadding = Instance.new("UIPadding")
+    TabPadding.Parent = TabContainer
+    TabPadding.PaddingBottom = UDim.new(0, 70)
     
     -- Content Container (Right side)
     local ContentContainer = Instance.new("Frame")
@@ -217,9 +473,46 @@ function Library:CreateWindow(title)
     ContentContainer.Position = UDim2.new(0, 141, 0, 32)
     ContentContainer.Size = UDim2.new(1, -141, 1, -32)
     ContentContainer.ClipsDescendants = true
+    ContentContainer.ZIndex = 2
     
     -- Parent to CoreGui
     ScreenGui.Parent = game:GetService("CoreGui")
+    
+    -- Intro animation
+    task.spawn(function()
+        MainWindow.Size = UDim2.new(0, 0, 0, 0)
+        MainWindow.Position = UDim2.new(0.5, 0, 0.5, 0)
+        ScreenGui.Enabled = true
+        
+        -- Fade in background
+        Tween(MainWindow, {BackgroundTransparency = 0}, 0.3)
+        
+        -- Scale up window
+        Tween(MainWindow, {
+            Size = UDim2.new(0, 600, 0, 500),
+            Position = UDim2.new(0.5, -300, 0.5, -250)
+        }, 0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+        
+        task.wait(0.2)
+        
+        -- Fade in all elements
+        for _, child in pairs(MainWindow:GetDescendants()) do
+            if child:IsA("TextLabel") or child:IsA("TextButton") or child:IsA("TextBox") then
+                child.TextTransparency = 1
+                Tween(child, {TextTransparency = 0}, 0.3)
+            end
+            if child:IsA("Frame") and child.BackgroundTransparency ~= 1 then
+                local originalTrans = child.BackgroundTransparency
+                child.BackgroundTransparency = 1
+                Tween(child, {BackgroundTransparency = originalTrans}, 0.3)
+            end
+            if child:IsA("ImageLabel") or child:IsA("ImageButton") then
+                local originalTrans = child.ImageTransparency
+                child.ImageTransparency = 1
+                Tween(child, {ImageTransparency = originalTrans}, 0.3)
+            end
+        end
+    end)
     
     -- Window object
     local Window = {
@@ -312,31 +605,57 @@ function Library:CreateTab(Window, name)
     -- Tab hover effects
     TabButton.MouseEnter:Connect(function()
         if TabIndicator.Size.X.Offset == 0 then
-            Tween(TabButton, {BackgroundColor3 = Color3.fromRGB(22, 22, 22)})
+            Tween(TabButton, {BackgroundColor3 = Color3.fromRGB(22, 22, 22)}, 0.15)
+            Tween(TabButton, {TextColor3 = Color3.fromRGB(180, 180, 180)}, 0.15)
         end
     end)
     
     TabButton.MouseLeave:Connect(function()
         if TabIndicator.Size.X.Offset == 0 then
-            Tween(TabButton, {BackgroundColor3 = Color3.fromRGB(18, 18, 18)})
+            Tween(TabButton, {BackgroundColor3 = Color3.fromRGB(18, 18, 18)}, 0.15)
+            Tween(TabButton, {TextColor3 = Color3.fromRGB(160, 160, 160)}, 0.15)
         end
     end)
     
     -- Tab click handler
     TabButton.MouseButton1Click:Connect(function()
+        CreateRipple(TabButton)
+        
         -- Deselect all tabs
         for _, tab in pairs(Window.Tabs) do
-            tab.Button.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
-            tab.Button.TextColor3 = Color3.fromRGB(160, 160, 160)
-            tab.Indicator.Size = UDim2.new(0, 0, 1, 0)
+            Tween(tab.Button, {BackgroundColor3 = Color3.fromRGB(18, 18, 18)}, 0.2)
+            Tween(tab.Button, {TextColor3 = Color3.fromRGB(160, 160, 160)}, 0.2)
+            Tween(tab.Indicator, {Size = UDim2.new(0, 0, 1, 0)}, 0.2)
             tab.Content.Visible = false
         end
         
-        -- Select this tab
-        TabButton.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-        TabButton.TextColor3 = Color3.fromRGB(220, 220, 220)
-        Tween(TabIndicator, {Size = UDim2.new(0, 3, 1, 0)}, 0.15)
+        -- Select this tab with animation
+        Tween(TabButton, {BackgroundColor3 = Color3.fromRGB(25, 25, 25)}, 0.2)
+        Tween(TabButton, {TextColor3 = Color3.fromRGB(220, 220, 220)}, 0.2)
+        Tween(TabIndicator, {Size = UDim2.new(0, 3, 1, 0)}, 0.2, Enum.EasingStyle.Back)
+        
+        -- Fade in content
         TabContent.Visible = true
+        for _, child in pairs(TabContent:GetChildren()) do
+            if child:IsA("Frame") then
+                child.BackgroundTransparency = 1
+                for _, subchild in pairs(child:GetDescendants()) do
+                    if subchild:IsA("TextLabel") or subchild:IsA("TextButton") or subchild:IsA("TextBox") then
+                        subchild.TextTransparency = 1
+                    end
+                end
+                
+                task.spawn(function()
+                    task.wait(0.05)
+                    Tween(child, {BackgroundTransparency = 0}, 0.2)
+                    for _, subchild in pairs(child:GetDescendants()) do
+                        if subchild:IsA("TextLabel") or subchild:IsA("TextButton") or subchild:IsA("TextBox") then
+                            Tween(subchild, {TextTransparency = 0}, 0.2)
+                        end
+                    end
+                end)
+            end
+        end
         
         Window.CurrentTab = Tab
     end)
@@ -484,17 +803,32 @@ function Library:CreateToggle(Tab, text, default, callback)
     ToggleBox.MouseButton1Click:Connect(function()
         toggled = not toggled
         Checkmark.Visible = toggled
-        ToggleBox.BorderColor3 = toggled and Color3.fromRGB(100, 100, 255) or Color3.fromRGB(50, 50, 50)
+        
+        -- Animate border color
+        Tween(ToggleBox, {
+            BorderColor3 = toggled and Color3.fromRGB(100, 100, 255) or Color3.fromRGB(50, 50, 50)
+        }, 0.2)
+        
+        -- Animate checkmark
+        if toggled then
+            Checkmark.Size = UDim2.new(0, 0, 0, 0)
+            Checkmark.Visible = true
+            Tween(Checkmark, {Size = UDim2.new(0, 10, 0, 10)}, 0.2, Enum.EasingStyle.Back)
+        end
+        
+        CreateRipple(ToggleBox)
         callback(toggled)
     end)
     
     -- Hover effects
     ToggleBox.MouseEnter:Connect(function()
-        Tween(ToggleBox, {BackgroundColor3 = Color3.fromRGB(30, 30, 30)})
+        Tween(ToggleBox, {BackgroundColor3 = Color3.fromRGB(30, 30, 30)}, 0.15)
+        Tween(Label, {TextColor3 = Color3.fromRGB(220, 220, 220)}, 0.15)
     end)
     
     ToggleBox.MouseLeave:Connect(function()
-        Tween(ToggleBox, {BackgroundColor3 = Color3.fromRGB(25, 25, 25)})
+        Tween(ToggleBox, {BackgroundColor3 = Color3.fromRGB(25, 25, 25)}, 0.15)
+        Tween(Label, {TextColor3 = Color3.fromRGB(200, 200, 200)}, 0.15)
     end)
     
     -- Toggle object with methods
@@ -659,11 +993,19 @@ function Library:CreateSlider(Tab, text, min, max, default, callback)
     
     -- Hover effects
     SliderButton.MouseEnter:Connect(function()
-        Tween(SliderButton, {BackgroundColor3 = Color3.fromRGB(220, 220, 220)})
+        Tween(SliderButton, {
+            BackgroundColor3 = Color3.fromRGB(220, 220, 220),
+            Size = UDim2.new(0, 16, 0, 16)
+        }, 0.15, Enum.EasingStyle.Back)
+        Tween(Label, {TextColor3 = Color3.fromRGB(220, 220, 220)}, 0.15)
     end)
     
     SliderButton.MouseLeave:Connect(function()
-        Tween(SliderButton, {BackgroundColor3 = Color3.fromRGB(200, 200, 200)})
+        Tween(SliderButton, {
+            BackgroundColor3 = Color3.fromRGB(200, 200, 200),
+            Size = UDim2.new(0, 14, 0, 14)
+        }, 0.15)
+        Tween(Label, {TextColor3 = Color3.fromRGB(200, 200, 200)}, 0.15)
     end)
     
     -- Slider object with methods
@@ -884,11 +1226,19 @@ function Library:CreateColorPicker(Tab, text, default, callback)
     
     -- Hover effect
     ColorDisplay.MouseEnter:Connect(function()
-        ColorDisplay.BorderColor3 = Color3.fromRGB(100, 100, 255)
+        Tween(ColorDisplay, {
+            BorderColor3 = Color3.fromRGB(100, 100, 255),
+            Size = UDim2.new(0, 30, 0, 18)
+        }, 0.15, Enum.EasingStyle.Back)
+        Tween(Label, {TextColor3 = Color3.fromRGB(220, 220, 220)}, 0.15)
     end)
     
     ColorDisplay.MouseLeave:Connect(function()
-        ColorDisplay.BorderColor3 = Color3.fromRGB(50, 50, 50)
+        Tween(ColorDisplay, {
+            BorderColor3 = Color3.fromRGB(50, 50, 50),
+            Size = UDim2.new(0, 28, 0, 16)
+        }, 0.15)
+        Tween(Label, {TextColor3 = Color3.fromRGB(200, 200, 200)}, 0.15)
     end)
     
     -- ColorPicker object with methods
@@ -1010,13 +1360,17 @@ function Library:CreateKeybind(Tab, text, default, callback)
     -- Hover effects
     KeybindButton.MouseEnter:Connect(function()
         if not listening then
-            Tween(KeybindButton, {BackgroundColor3 = Color3.fromRGB(30, 30, 30)})
+            Tween(KeybindButton, {BackgroundColor3 = Color3.fromRGB(30, 30, 30)}, 0.15)
+            Tween(KeybindButton, {BorderColor3 = Color3.fromRGB(100, 100, 255)}, 0.15)
+            Tween(Label, {TextColor3 = Color3.fromRGB(220, 220, 220)}, 0.15)
         end
     end)
     
     KeybindButton.MouseLeave:Connect(function()
         if not listening then
-            Tween(KeybindButton, {BackgroundColor3 = Color3.fromRGB(25, 25, 25)})
+            Tween(KeybindButton, {BackgroundColor3 = Color3.fromRGB(25, 25, 25)}, 0.15)
+            Tween(KeybindButton, {BorderColor3 = Color3.fromRGB(50, 50, 50)}, 0.15)
+            Tween(Label, {TextColor3 = Color3.fromRGB(200, 200, 200)}, 0.15)
         end
     end)
     
@@ -1196,11 +1550,13 @@ function Library:CreateDropdown(Tab, text, options, default, callback)
     
     -- Hover effect
     DropdownButton.MouseEnter:Connect(function()
-        Tween(DropdownButton, {BackgroundColor3 = Color3.fromRGB(30, 30, 30)})
+        Tween(DropdownButton, {BackgroundColor3 = Color3.fromRGB(30, 30, 30)}, 0.15)
+        Tween(Label, {TextColor3 = Color3.fromRGB(220, 220, 220)}, 0.15)
     end)
     
     DropdownButton.MouseLeave:Connect(function()
-        Tween(DropdownButton, {BackgroundColor3 = Color3.fromRGB(25, 25, 25)})
+        Tween(DropdownButton, {BackgroundColor3 = Color3.fromRGB(25, 25, 25)}, 0.15)
+        Tween(Label, {TextColor3 = Color3.fromRGB(200, 200, 200)}, 0.15)
     end)
     
     -- Set initial size
@@ -1274,21 +1630,24 @@ function Library:CreateButton(Tab, text, callback)
     
     -- Click handler
     Button.MouseButton1Click:Connect(function()
+        CreateRipple(Button)
         callback()
         
         -- Click animation
-        Button.BackgroundColor3 = Color3.fromRGB(100, 100, 255)
+        Tween(Button, {BackgroundColor3 = Color3.fromRGB(100, 100, 255)}, 0.1)
         task.wait(0.1)
-        Button.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+        Tween(Button, {BackgroundColor3 = Color3.fromRGB(25, 25, 25)}, 0.2)
     end)
     
     -- Hover effects
     Button.MouseEnter:Connect(function()
-        Tween(Button, {BackgroundColor3 = Color3.fromRGB(30, 30, 30)})
+        Tween(Button, {BackgroundColor3 = Color3.fromRGB(30, 30, 30)}, 0.15)
+        Tween(Button, {BorderColor3 = Color3.fromRGB(100, 100, 255)}, 0.15)
     end)
     
     Button.MouseLeave:Connect(function()
-        Tween(Button, {BackgroundColor3 = Color3.fromRGB(25, 25, 25)})
+        Tween(Button, {BackgroundColor3 = Color3.fromRGB(25, 25, 25)}, 0.15)
+        Tween(Button, {BorderColor3 = Color3.fromRGB(50, 50, 50)}, 0.15)
     end)
     
     -- Button object
